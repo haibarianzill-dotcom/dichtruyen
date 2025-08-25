@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>📚 Dịch Truyện với Gemini</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <style>
+    body { background: #f8f9fa; padding: 20px; }
+    .card { border-radius: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+    .progress-bar { height: 10px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 class="text-center mb-4">📚 Công cụ Dịch Truyện Tự động</h1>
+
+    <div class="card mb-4">
+      <div class="card-body">
+        <h5>📤 Nhập nội dung</h5>
+        <input type="file" id="fileInput" accept=".txt" class="form-control mb-2" />
+        <textarea id="textInput" class="form-control" rows="3" placeholder="Dán nội dung truyện ở đây..."></textarea>
+        <button onclick="loadContent()" class="btn btn-primary mt-2">Tải nội dung</button>
+      </div>
+    </div>
+
+    <div class="card mb-4">
+      <div class="card-body">
+        <h5>⚙️ Cài đặt dịch</h5>
+        <div class="mb-2">
+          <label>API Keys (nhiều cái, ngăn bằng dấu phẩy)</label>
+          <input type="text" id="apiKeys" class="form-control" placeholder="your-api-key-1, your-api-key-2" />
+        </div>
+        <div class="mb-2">
+          <label>Prompt dịch</label>
+          <input type="text" id="prompt" class="form-control" value="Dịch tự nhiên, giữ nguyên cảm xúc, phong cách truyện" />
+        </div>
+        <div class="row g-2">
+          <div class="col-md-6">
+            <label>Chương bắt đầu</label>
+            <input type="number" id="startChapter" class="form-control" value="1" min="1" />
+          </div>
+          <div class="col-md-6">
+            <label>Chương kết thúc</label>
+            <input type="number" id="endChapter" class="form-control" value="10" min="1" />
+          </div>
+        </div>
+        <button onclick="translateRange()" class="btn btn-success mt-2">🚀 Dịch khoảng đã chọn</button>
+        <button onclick="exportEpub()" class="btn btn-warning mt-2">📥 Xuất EPUB</button>
+      </div>
+    </div>
+
+    <div class="alert alert-info" id="progress">Chưa có chương nào.</div>
+    <div id="chapters"></div>
+  </div>
+
+  <script>
+    let chapters = [];
+    let translated = {};
+
+    async function loadContent() {
+      const formData = new FormData();
+      const file = document.getElementById('fileInput').files[0];
+      const text = document.getElementById('textInput').value;
+
+      if (file) formData.append('file', file);
+      else formData.append('text', text);
+
+      const res = await fetch('/upload', { method: 'POST', body: formData });
+      chapters = await res.json();
+      renderChapters();
+    }
+
+    function renderChapters() {
+      const container = document.getElementById('chapters');
+      container.innerHTML = '<h4>📚 Các chương</h4>';
+      chapters.forEach((chap, i) => {
+        const div = document.createElement('div');
+        div.innerHTML = `
+          <div class="card mb-2">
+            <div class="card-body">
+              <h6>${chap.title}</h6>
+              <div><small><strong>Dịch:</strong> <span id="trans-${i}">[Chưa dịch]</span></small></div>
+            </div>
+          </div>`;
+        container.appendChild(div);
+      });
+      updateProgress();
+    }
+
+    async function translateRange() {
+      const start = +document.getElementById('startChapter').value;
+      const end = +document.getElementById('endChapter').value;
+      const apiKeys = document.getElementById('apiKeys').value;
+      const prompt = document.getElementById('prompt').value;
+
+      const res = await fetch('/translate-range', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ start, end, api_keys: apiKeys, prompt })
+      });
+
+      alert('✅ Đã xử lý xong! Tải lại trang để xem kết quả.');
+      location.reload();
+    }
+
+    async function exportEpub() {
+      const title = prompt("Tên truyện:", "Truyện đã dịch") || "Truyện đã dịch";
+      const data = {
+        title,
+        author: "Dịch bởi Gemini",
+        chapters: chapters.map((chap, i) => ({
+          title: chap.title,
+          content: translated[i] || chap.content
+        }))
+      };
+
+      const res = await fetch('/export-epub', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      const json = await res.json();
+      const a = document.createElement('a');
+      a.href = json.url;
+      a.download = `${title}.epub`;
+      a.click();
+    }
+
+    function updateProgress() {
+      const done = Object.keys(translated).length;
+      document.getElementById('progress').innerHTML = `✅ Đã dịch: ${done}/${chapters.length} chương`;
+    }
+  </script>
+</body>
+</html>
