@@ -123,6 +123,12 @@ def translate_range():
     save_session(user_id, session)
     return jsonify({'status': 'success', 'translated_count': len(chapters_to_translate)})
 
+@app.route('/status')
+def get_status():
+    user_id = request.cookies.get('user_id', 'default')
+    session = load_session(user_id)
+    return jsonify(session)
+
 @app.route('/export-epub', methods=['POST'])
 def export_epub():
     data = request.json
